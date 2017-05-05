@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Employee</title>
+    <!-- bootstrap  -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <!-- font integration -->
+    <link href="https://fonts.googleapis.com/css?family=Lato" rel="stylesheet">
+  </head>
+  <body>
+
+    <div id="logInDiv">
+      <input type="text" id="usernameInput" placeholder="Username">
+      <input type="password" id="passwordInput" placeholder="Password">
+      <button id="btnlogIn">LOG IN</button>
+    </div>
+
+    <div id="chatDiv" style="display: none">
+      <ul id="chat_window">
+
+      </ul>
+
+
+      <input type="text" id="chatInput">
+      <button id="btnSend">SEND</button>
+    </div>
+
+    <!-- script to use the jquery and the sockets  -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.7.3/socket.io.slim.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <!-- my script -->
+    <script>
+      var socket = io.connect("http://localhost:500");
+
+      // using script here cause its a short one
+      $("#btnlogIn").click(function(){
+        var sUsername = $("#usernameInput").val();
+        var sPassword =  $("#passwordInput").val();
+
+        // console.log(sUsername+sPassword);
+
+        socket.emit("customer_log_in", {"username":sUsername, "password":sPassword});
+      });
+
+      // response based on the server success or failure with the log in
+      socket.on("login_response", function(jData){
+        var sMessage = jData.message;
+        // console.log(sMessage);
+
+        if(sMessage == "success"){
+          // console.log("if is a success");
+          $("#logInDiv").hide();
+          $("#chatDiv").show();
+        }
+      });
+
+      // // using jQuery to send a message to the server
+      $("#btnSend").click(function(){
+        // geting whatever user inputed
+        var sMessage = $("#chatInput").val();
+        $("#chat_window").append("<li>"+"You: "+sMessage+"</li>");
+        // console.log(sMessage);
+        $("chatInput").val('');
+        socket.emit("customer_chat", {"message":sMessage});
+      });
+
+      socket.on("server_response", function(jData){
+        var sMessage = jData.message;
+        console.log(sMessage);
+        $("#chat_window").append("<li>"+"Customer: "+sMessage+"</li>");
+      });
+
+    </script>
+  </body>
+</html>
