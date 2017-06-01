@@ -1,10 +1,14 @@
 // making a server
-var express = require("express");
+var express = require("express"), redirect = require("express-redirect");
 var app = express();
+redirect(app);
 
 // creating a socket server
 var server = require("http").Server(app);
 var io = require("socket.io")(server);
+
+// use the file system - fs comes with node, no need to install it
+var fs = require("fs");
 
 // enabling the input from the console
 var readline = require('readline');
@@ -73,6 +77,23 @@ io.on("connection", function(oSocket){
      });
    });
 
+   /************ retriving leasure bikes from the database ********************/
+
+   oSocket.on("retrive_leasure", function(jData){
+     // calling all leasure bikes from the database
+     mongo.connect(sPath, function(err, oDb){
+       if(err) throw err;
+       // read the data from the collection
+       var leasureBikes = oDb.collection("leasure");
+
+       // listing all bikes that are under leasure collection
+       leasureBikes.find({"name":"leasure"}).toArray(function(err, ajBikes){
+        //  console.log(ajBikes);
+        oSocket.emit("leasure_bikes_from_db", ajBikes);
+       });
+     });
+   });
+
 
   //  end of sockets //
 });
@@ -90,6 +111,33 @@ app.get("/customer_log_in", function(req, res){
 // making a gui for the customer for the customer_chat
 app.get("/customer_chat", function(req, res){
   res.sendFile(__dirname+"/gui/customer_chat.html");
+});
+
+// leasure bikes
+app.get("/leasureBikeSite", function(req, res){
+  res.sendFile(__dirname+"/gui/leasureBikeSite.html");
+});
+
+// leasure bike
+app.get("/leasureBike/:modelName", function(req, res){
+  var modelName = req.params.modelName;
+  console.log("Ajax method works --> "+modelName);
+
+  // based on the chosen model we populate the following html page
+  fs.readFile(__dirname+"/gui/leasureBike.html" , "utf8", function(err, sData){
+
+    console.log("The page is this: "+sData);
+    var result = sData.replace("{{model-name}}", modelName);
+
+    fs.writeFile(__dirname+"/gui/leasureBike.html", result, "utf8", function(err){
+      if(err) return console.log(err);
+      res.send(sData);
+    });
+  });
+});
+
+app.get("/leasureBike", function(req, res){
+  res.sendFile(__dirname+"/gui/leasureBike.html");
 });
 
 // starting server and sockets on this port

@@ -1,0 +1,4 @@
+fix a ajax call to the server
+start working on some basic css: positioning on the page
+implement employee log-in screen in the webpage
+implement customer_log_in in the bottom right corner of the website

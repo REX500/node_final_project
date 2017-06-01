@@ -38,9 +38,12 @@
         var sUsername = $("#usernameInput").val();
         var sPassword =  $("#passwordInput").val();
 
-        // console.log(sUsername+sPassword);
+         console.log(sUsername+sPassword);
+
+
 
         socket.emit("customer_log_in", {"username":sUsername, "password":sPassword});
+
       });
 
       // response based on the server success or failure with the log in
@@ -61,7 +64,7 @@
         var sMessage = $("#chatInput").val();
         $("#chat_window").append("<li>"+"You: "+sMessage+"</li>");
         // console.log(sMessage);
-        $("chatInput").val('');
+        $("#chatInput").val('');
         socket.emit("customer_chat", {"message":sMessage});
       });
 

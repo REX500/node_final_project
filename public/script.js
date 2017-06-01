@@ -35,11 +35,16 @@ socket.on("returning_bike_types", function(jData){
   $("#bike-div").show();
   for(let i = 1; i < jData.length; i++){
     var extension = "AnchorElement";
-      $("#bike-div").append("<a id="+jData[i].name+extension+"><h1>"+jData[i].name+"</h1></a>"+"<br>");
+    var style = "cursor: pointer";// @fixme!
+    var result = "leasureBikeSite";
+
+      $("#bike-div").append("<a href="+result+" id="+jData[i].name+extension+" style="+style+"><h1>"+jData[i].name+"</h1></a>"+"<br>");
   }
 });
 
 // buying a bike
-$("#leasureAnchorElement").click(function(){
-  console.log("Clicked on leasure element");
+$(function() {
+$(document).on("click", '#leasureAnchorElement', function() {
+  console.log("It works");
 });
+  });
