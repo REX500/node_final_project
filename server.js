@@ -116,8 +116,16 @@ app.get("/", function(req, res){
   res.sendFile(__dirname+"/gui/index.html");
 });
 
-app.get("/customer_log_in", function(req, res){
-  res.sendFile(__dirname+"/gui/customer_log_in.html")
+app.get("/employee_log_in", function(req, res){
+  res.sendFile(__dirname+"/gui/employee_log_in.html")
+});
+
+app.get("/roadBike/customerLogin/:chosenBike", function(req, res){
+  // bike that customer has choosen, will be saved for later use when
+  // he logs in or makes an account
+  let chosenBike = req.params.chosenBike;
+  console.log(chosenBike);
+  res.sendFile(__dirname+"/gui/logInScreen.html");
 });
 
 // making a gui for the customer for the customer_chat
