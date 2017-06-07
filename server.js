@@ -26,6 +26,18 @@ app.use(express.static(__dirname+'/public'));
 /*******************************************************/
 /*******************************************************/
 
+// calling global methods //
+
+getLeasureBikes();
+getMtbBikes();
+getRoadBikes();
+
+// global variables //
+
+let globalJsonLeasureBikes= [];
+let globalJsonMtbBikes = [];
+let globalJsonRoadBikes = [];
+
 io.on("connection", function(oSocket){
   // on is used to receive the message
   // emit is used to send the message
@@ -42,7 +54,7 @@ io.on("connection", function(oSocket){
     var username = jData.username;
     var password = jData.password;
 
-    // checking if the username and password exist in the database
+    // checking if the username and password exists in the database
     mongo.connect(sPath, function(err, oDb){
       var employee = oDb.collection("employee");
       // checking if mongo can fetch the employee
@@ -51,7 +63,7 @@ io.on("connection", function(oSocket){
           console.log("Employee doesnt exist");
         }
         // console.log(ajEmployee[0].name);
-        if(username==ajEmployee[0].username && password==ajEmployee[0].password){
+        else /*(username==ajEmployee[0].username && password==ajEmployee[0].password)*/{
           console.log("they match");
           // employee exists so now we can call a function that presents a employee with a chat view
             oSocket.emit("login_response", {"message":"success"});
@@ -80,20 +92,20 @@ io.on("connection", function(oSocket){
    /************ retriving leasure bikes from the database ********************/
 
    oSocket.on("retrive_leasure", function(jData){
-     // calling all leasure bikes from the database
-     mongo.connect(sPath, function(err, oDb){
-       if(err) throw err;
-       // read the data from the collection
-       var leasureBikes = oDb.collection("leasure");
-
-       // listing all bikes that are under leasure collection
-       leasureBikes.find({"name":"leasure"}).toArray(function(err, ajBikes){
-        //  console.log(ajBikes);
-        oSocket.emit("leasure_bikes_from_db", ajBikes);
-       });
-     });
+      oSocket.emit("leasure_bikes_from_db", globalJsonLeasureBikes);
    });
 
+   /************ retriving mtb bikes from the database ********************/
+
+   oSocket.on("retrive_mtb", function(jData){
+     oSocket.emit("mtb_bikes_from_db", globalJsonMtbBikes);
+   });
+
+   /************ retriving road bikes from the database ********************/
+
+   oSocket.on("retrive_road", function(jData){
+     oSocket.emit("road_bikes_from_db", globalJsonRoadBikes);
+   });
 
   //  end of sockets //
 });
@@ -118,21 +130,119 @@ app.get("/leasureBikeSite", function(req, res){
   res.sendFile(__dirname+"/gui/leasureBikeSite.html");
 });
 
-// leasure bike
+// mtb bikes
+app.get("/mtbBikeSite", function(req, res){
+  res.sendFile(__dirname+"/gui/mtbBikeSite.html");
+});
+
+// road bikes
+app.get("/roadBikeSite", function(req, res){
+  res.sendFile(__dirname+"/gui/roadBikeSite.html");
+});
+
+// displaying a leasure bike
 app.get("/leasureBike/:modelName", function(req, res){
+
   var modelName = req.params.modelName;
-  console.log("Ajax method works --> "+modelName);
+  console.log("Href method works --> "+modelName);
 
   // based on the chosen model we populate the following html page
   fs.readFile(__dirname+"/gui/leasureBike.html" , "utf8", function(err, sData){
 
-    console.log("The page is this: "+sData);
-    var result = sData.replace("{{model-name}}", modelName);
+    // console.log("The page is this: "+sData);
+    let correctIndex;
+    for(let i = 0; i < globalJsonLeasureBikes.length ; i++){
+      // finding the clicked bike now
+      if(modelName == globalJsonLeasureBikes[i].modelName){
+        console.log("Name matches: "+globalJsonLeasureBikes[i].modelName);
+        correctIndex = i;
+        break;
+      }
+    }
 
-    fs.writeFile(__dirname+"/gui/leasureBike.html", result, "utf8", function(err){
-      if(err) return console.log(err);
-      res.send(sData);
-    });
+    console.log("Right index is: "+correctIndex);
+
+    // replacing the placeholders in the html file heck yea
+    sData = sData.replace("{{bike-name}}", globalJsonLeasureBikes[correctIndex].modelName);
+    sData = sData.replace("{{bike-weight}}", globalJsonLeasureBikes[correctIndex].weight);
+    sData = sData.replace("{{bike-drivetrain}}", globalJsonLeasureBikes[correctIndex].drivetrain);
+    sData = sData.replace("{{bike-wheels}}", globalJsonLeasureBikes[correctIndex].wheels);
+    sData = sData.replace("{{bike-tyres}}", globalJsonLeasureBikes[correctIndex].tyres);
+
+    res.send(sData);
+  });
+});
+
+// displaying a mtb bike-tyres
+
+app.get("/mtbBike/:modelName", function(req, res){
+  var modelName = req.params.modelName;
+
+  console.log("Href method works --> "+modelName);
+
+  // based on the chosen model we populate the following html page
+  fs.readFile(__dirname+"/gui/mtbBike.html" , "utf8", function(err, sData){
+
+    // console.log("The page is this: "+sData);
+    let correctIndex;
+    for(let i = 0; i < globalJsonMtbBikes.length ; i++){
+      // finding the clicked bike now
+      if(modelName == globalJsonMtbBikes[i].modelName){
+        console.log("Name matches: "+globalJsonMtbBikes[i].modelName);
+        correctIndex = i;
+        break;
+      }
+    }
+
+    console.log("Right index is: "+correctIndex);
+
+    // replacing the placeholders in the html file heck yea
+    sData = sData.replace("{{bike-name}}", globalJsonMtbBikes[correctIndex].modelName);
+    sData = sData.replace("{{bike-weight}}", globalJsonMtbBikes[correctIndex].weight);
+    sData = sData.replace("{{bike-drivetrain}}", globalJsonMtbBikes[correctIndex].drivetrain);
+    sData = sData.replace("{{bike-wheels}}", globalJsonMtbBikes[correctIndex].wheels);
+    sData = sData.replace("{{bike-tyres}}", globalJsonMtbBikes[correctIndex].tyres);
+
+    res.send(sData);
+  });
+});
+
+// displaying a certain road bike
+app.get("/roadBike/:modelName", function(req, res){
+  var modelName = req.params.modelName;
+
+  console.log("Href method works --> "+modelName);
+
+  // based on the chosen model we populate the following html page
+  fs.readFile(__dirname+"/gui/roadBike.html" , "utf8", function(err, sData){
+
+    // console.log("The page is this: "+sData);
+    let correctIndex;
+    for(let i = 0; i < globalJsonRoadBikes.length ; i++){
+      // finding the clicked bike now
+      if(modelName == globalJsonRoadBikes[i].modelName){
+        console.log("Name matches: "+globalJsonRoadBikes[i].modelName);
+        correctIndex = i;
+        break;
+      }
+    }
+
+    console.log("Right index is: "+correctIndex);
+
+    // replacing the placeholders in the html file heck yea
+    sData = sData.replace("{{bike-name}}", globalJsonRoadBikes[correctIndex].name);
+    sData = sData.replace("{{bike-model}}", globalJsonRoadBikes[correctIndex].modelName);
+    sData = sData.replace("{{bike-type}}", globalJsonRoadBikes[correctIndex].type);
+    sData = sData.replace("{{bike-color}}", globalJsonRoadBikes[correctIndex].color);
+    sData = sData.replace("{{bike-weight}}", globalJsonRoadBikes[correctIndex].weight);
+    sData = sData.replace("{{bike-groupset}}", globalJsonRoadBikes[correctIndex].groupset);
+    sData = sData.replace("{{bike-saddle}}", globalJsonRoadBikes[correctIndex].saddle);
+    sData = sData.replace("{{bike-wheels}}", globalJsonRoadBikes[correctIndex].wheels);
+    sData = sData.replace("{{bike-tyres}}", globalJsonRoadBikes[correctIndex].tyres);
+    sData = sData.replace("{{bike-brakes}}", globalJsonRoadBikes[correctIndex].brakes);
+    sData = sData.replace("{{bike-price}}", globalJsonRoadBikes[correctIndex].price);
+
+    res.send(sData);
   });
 });
 
@@ -147,3 +257,70 @@ server.listen(500, function(err){
   }
   console.log("server is running");
 });
+
+
+/********************************************************/
+/********************************************************/
+/********************************************************/
+/********************************************************/
+/********************************************************/
+
+//   methods that retrive the data from the database fuck yea //
+
+// leasure bikes retrival
+
+function getLeasureBikes(){
+  console.log("getLeasureBikes function is called....");
+  mongo.connect(sPath, function(err, oDb){
+    if(err) throw err;
+    // read the data from the collection
+    var leasureBikes = oDb.collection("leasure");
+    console.log("Retriving the bikes....");
+    // listing all bikes that are under leasure collection
+    leasureBikes.find({"name":"leasure"}).toArray(function(err, ajBikes){
+     //  console.log(ajBikes);
+     // putting the bikes into a global array
+     globalJsonLeasureBikes = ajBikes;
+     console.log("Bikes are now in the globalJsonLeasureBikes array");
+    });
+  });
+}
+
+
+// mountain bike retrival
+
+function getMtbBikes(){
+  console.log("getMtbBikes function is called....");
+  mongo.connect(sPath, function(err, oDb){
+    if(err) throw err;
+    // read the data from the collection
+    var mtbBikes = oDb.collection("mtb");
+    console.log("Retriving the bikes....");
+    // listing all bikes that are under mtb collection
+    mtbBikes.find({"name":"mtb"}).toArray(function(err, ajBikes){
+      // console.log(ajBikes);
+     // putting the bikes into a global array
+     globalJsonMtbBikes = ajBikes;
+     console.log("Bikes are now in the globalJsonMtbBikes array");
+    });
+  });
+}
+
+// road bike retrival
+
+function getRoadBikes(){
+  console.log("getRoadBikes function is called....");
+  mongo.connect(sPath, function(err, oDb){
+    if(err) throw err;
+    // read the data from the collection
+    var roadBikes = oDb.collection("road");
+    console.log("Retriving the bikes....");
+    // listing all bikes that are under road collection
+    roadBikes.find({"name":"road"}).toArray(function(err, ajBikes){
+      // console.log("road bikes: "+ajBikes);
+     // putting the bikes into a global array
+     globalJsonRoadBikes = ajBikes;
+     console.log("Bikes are now in the globalJsonRoadBikes array");
+    });
+  });
+}
