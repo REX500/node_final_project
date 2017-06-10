@@ -31,12 +31,14 @@ app.use(express.static(__dirname+'/public'));
 getLeasureBikes();
 getMtbBikes();
 getRoadBikes();
+getAllCustomers();
 
 // global variables //
 
 let globalJsonLeasureBikes= [];
 let globalJsonMtbBikes = [];
 let globalJsonRoadBikes = [];
+let globalJsonCustomers = [];
 
 io.on("connection", function(oSocket){
   // on is used to receive the message
@@ -107,6 +109,34 @@ io.on("connection", function(oSocket){
      oSocket.emit("road_bikes_from_db", globalJsonRoadBikes);
    });
 
+   oSocket.on("register-new-user", function(jData){
+     console.log("Socket recieved!!");
+     console.log("mail is: "+jData.email);
+     registerNewUser(jData.firstname,
+                     jData.lastname,
+                     jData.nationality,
+                     jData.email,
+                     jData.password,
+                     jData.phone,
+                     jData.address);
+     oSocket.emit("new-user-registration", {"message": "sucess"});
+     // calling the method again so that the list refreshes
+     getAllCustomers();
+   });
+
+   oSocket.on("user-login", function(jData){
+     console.log("email is: "+jData.email+" and pass: "+jData.password);
+     // calling a method that will authenticate the entered data
+     var result = checkCustomer(jData);
+     console.log("result is: "+result);
+     if(result == "sucess"){
+       oSocket.emit("user-login", {"message":result});
+     }
+     else{
+       oSocket.emit("user-login", {"message":result});
+     }
+   });
+
   //  end of sockets //
 });
 
@@ -125,6 +155,10 @@ app.get("/roadBike/customerLogin/:chosenBike", function(req, res){
   // he logs in or makes an account
   let chosenBike = req.params.chosenBike;
   console.log(chosenBike);
+  res.sendFile(__dirname+"/gui/logInScreen.html");
+});
+
+app.get("/customerLogin", function(req, res){
   res.sendFile(__dirname+"/gui/logInScreen.html");
 });
 
@@ -328,7 +362,60 @@ function getRoadBikes(){
       // console.log("road bikes: "+ajBikes);
      // putting the bikes into a global array
      globalJsonRoadBikes = ajBikes;
+     console.log("road bikes: "+ajBikes);
      console.log("Bikes are now in the globalJsonRoadBikes array");
     });
   });
+}
+
+// methods that write to the database
+
+// register a new user
+function registerNewUser(fname, lname, nationality, email, password, phone, address){
+  console.log("Adding a new user to the database");
+  mongo.connect(sPath, function(err, oDb){
+    if(err) throw err;
+    var customers = oDb.collection("customer");
+    customers.insert({"name":"customer","first-name": fname, "other-names": lname, "nationality": nationality, "email": email, "password": password, "phone-number": phone,"full-address":address, "additional-street-info":"blank", "chart":"empty", "number-of-purchases":"0", "grade":"5" }, function(err, uData){
+      console.log(uData);
+      console.log("User registered succesfully!");
+    });
+  });
+}
+
+// get all customers back
+function getAllCustomers(){
+  console.log("Getting all customers!");
+  mongo.connect(sPath, function(err, oDb){
+    if(err) throw err;
+    var customers = oDb.collection("customer");
+    customers.find({"name":"customer"}).toArray(function(err, ajCustomers){
+      // putting the customers into the array
+      globalJsonCustomers = ajCustomers;
+      console.log("Customers are now in the globalJsonCustomers array");
+    });
+  });
+}
+
+// check if the customer exists
+function checkCustomer(jData){
+  var result;
+  // console.log(globalJsonCustomers[1].email);
+  for(let i = 0; i < globalJsonCustomers.length; i++){
+    console.log("For loop started");
+    console.log(globalJsonCustomers[i].email);
+    if(globalJsonCustomers[i].email == jData.email && globalJsonCustomers[i].password == jData.password){
+      console.log("Customer found, he's name is: "+jData.email);
+      result = "sucess";
+      break;
+    }
+    else if(globalJsonCustomers.length - i == 1){
+      result = "failure";
+    }
+    else {
+      console.log("Customer couldnt be found");
+    }
+  }
+  console.log("function result is: "+result);
+  return result;
 }
