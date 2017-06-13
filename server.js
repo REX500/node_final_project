@@ -17,6 +17,9 @@ var readline = require('readline');
 var mongo = require("mongodb").MongoClient;
 var sPath = "mongodb://localhost:27017/cervelo";
 
+// using ipware
+var getIP = require('ipware')().get_ip;
+
 // enabling the usage of public files
 app.use(express.static(__dirname+'/public'));
 
@@ -39,6 +42,11 @@ let globalJsonLeasureBikes= [];
 let globalJsonMtbBikes = [];
 let globalJsonRoadBikes = [];
 let globalJsonCustomers = [];
+let globalJsonOneCustomer = [];
+let currentCustomersArray = [];
+var chosenBikeArray="";
+let logInCheck = false;
+let beenHereBefore = false;
 
 io.on("connection", function(oSocket){
   // on is used to receive the message
@@ -131,10 +139,35 @@ io.on("connection", function(oSocket){
      console.log("result is: "+result);
      if(result == "sucess"){
        oSocket.emit("user-login", {"message":result});
+       // we send the result back and then start the timer that lasts 1 second
+       // in which the browser can log in to the given link
+       // when the second passes user cannot longer log in with the same link
+       logInCheck = true;
+       beenHereBefore = true;
+       setTimeout(function (){
+         logInCheck = false;
+         console.log("set to false");
+       }, 200);
      }
      else{
        oSocket.emit("user-login", {"message":result});
      }
+   });
+
+   oSocket.on("get_customer_data", function(jData){
+     let email = jData.email;
+     let password = jData.password;
+     let correctIndex = 0;
+
+     for (var i = 0; i < globalJsonCustomers.length; i++) {
+       if(globalJsonCustomers[i].email == email && globalJsonCustomers[i].password == password){
+         console.log("email and password match!!");
+         correctIndex = i;
+         break;
+       }
+     }
+
+     oSocket.emit("here_is_the_customers_data", {"firstName":globalJsonCustomers[correctIndex].firstName, "otherNames":globalJsonCustomers[correctIndex].otherNames, "address":globalJsonCustomers[correctIndex].fullAddress,"phoneNumber":globalJsonCustomers[correctIndex].phoneNumber,"email":globalJsonCustomers[correctIndex].email});
    });
 
   //  end of sockets //
@@ -143,48 +176,107 @@ io.on("connection", function(oSocket){
 
 /*************** sending a html file to a client *********************/
 app.get("/", function(req, res){
+  beenHereBefore = false;
   res.sendFile(__dirname+"/gui/index.html");
 });
 
 app.get("/employee_log_in", function(req, res){
+  beenHereBefore = false;
   res.sendFile(__dirname+"/gui/employee_log_in.html")
 });
 
 app.get("/roadBike/customerLogin/:chosenBike", function(req, res){
+  beenHereBefore = false;
   // bike that customer has choosen, will be saved for later use when
   // he logs in or makes an account
   let chosenBike = req.params.chosenBike;
   console.log(chosenBike);
+  chosenBikeArray = chosenBike;
   res.sendFile(__dirname+"/gui/logInScreen.html");
 });
 
 app.get("/customerLogin", function(req, res){
+  beenHereBefore = false;
   res.sendFile(__dirname+"/gui/logInScreen.html");
 });
 
 // making a gui for the customer for the customer_chat
 app.get("/customer_chat", function(req, res){
+  beenHereBefore = false;
   res.sendFile(__dirname+"/gui/customer_chat.html");
 });
 
 // leasure bikes
 app.get("/leasureBikeSite", function(req, res){
+  beenHereBefore = false;
   res.sendFile(__dirname+"/gui/leasureBikeSite.html");
 });
 
 // mtb bikes
 app.get("/mtbBikeSite", function(req, res){
+  beenHereBefore = false;
   res.sendFile(__dirname+"/gui/mtbBikeSite.html");
 });
 
 // road bikes
 app.get("/roadBikeSite", function(req, res){
+  beenHereBefore = false;
   res.sendFile(__dirname+"/gui/roadBikeSite.html");
+});
+
+// frame geometry
+app.get("/geometry", function(req, res){
+  beenHereBefore = false;
+  res.sendFile(__dirname+"/gui/geometry.html");
+});
+
+// customer page
+app.get("/customerPage/:email", function(req, res){
+
+  if(logInCheck || beenHereBefore){
+    beenHereBefore = true;
+    // here we have to fulfill the page with the credentials of the user
+    let email = req.params.email;
+    //finding the user with the right email
+    fs.readFile(__dirname+"/gui/customerPage.html", "utf8", function(err, sData){
+      let correctIndex;
+
+      for (var i = 0; i < globalJsonCustomers.length; i++) {
+        if(globalJsonCustomers[i].email == email){
+          correctIndex = i;
+        }
+      }
+
+        sData = sData.replace("{{first-name}}", globalJsonCustomers[correctIndex].firstName);
+        sData = sData.replace("{{other-names}}", globalJsonCustomers[correctIndex].otherNames);
+        sData = sData.replace("{{email}}", globalJsonCustomers[correctIndex].email);
+        sData = sData.replace("{{password}}", globalJsonCustomers[correctIndex].password);
+        sData = sData.replace("{{phone-number}}", globalJsonCustomers[correctIndex].phoneNumber);
+        let selectedBike= "";
+        if(chosenBikeArray == ""){
+          selectedBike = "Your shopping cart is empty!";
+        }
+        else {
+          selectedBike = "You currently have one item in your cart: "+chosenBikeArray;
+        }
+
+        sData = sData.replace("{{chart-section}}", selectedBike);
+        res.send(sData);
+    });
+    var ipInfo = getIP(req);
+    console.log(ipInfo.clientIp);
+    currentCustomers(email, ipInfo.clientIp);
+
+    // res.send("Sup fuckaaaaa   ---> "+email+" ur IP is: "+ipInfo.clientIp);
+  }
+  else {
+    res.send("fuck off!!");
+  }
 });
 
 // displaying a leasure bike
 app.get("/leasureBike/:modelName", function(req, res){
-
+  beenHereBefore = false;
   var modelName = req.params.modelName;
   console.log("Href method works --> "+modelName);
 
@@ -218,6 +310,7 @@ app.get("/leasureBike/:modelName", function(req, res){
 // displaying a mtb bike-tyres
 
 app.get("/mtbBike/:modelName", function(req, res){
+  beenHereBefore = false;
   var modelName = req.params.modelName;
 
   console.log("Href method works --> "+modelName);
@@ -251,6 +344,7 @@ app.get("/mtbBike/:modelName", function(req, res){
 
 // displaying a certain road bike
 app.get("/roadBike/:modelName", function(req, res){
+  beenHereBefore = false;
   var modelName = req.params.modelName;
 
   console.log("Href method works --> "+modelName);
@@ -289,6 +383,7 @@ app.get("/roadBike/:modelName", function(req, res){
 });
 
 app.get("/leasureBike", function(req, res){
+  beenHereBefore = false;
   res.sendFile(__dirname+"/gui/leasureBike.html");
 });
 
@@ -376,7 +471,7 @@ function registerNewUser(fname, lname, nationality, email, password, phone, addr
   mongo.connect(sPath, function(err, oDb){
     if(err) throw err;
     var customers = oDb.collection("customer");
-    customers.insert({"name":"customer","first-name": fname, "other-names": lname, "nationality": nationality, "email": email, "password": password, "phone-number": phone,"full-address":address, "additional-street-info":"blank", "chart":"empty", "number-of-purchases":"0", "grade":"5" }, function(err, uData){
+    customers.insert({"name":"customer","firstName": fname, "otherNames": lname, "nationality": nationality, "email": email, "password": password, "phoneNumber": phone,"fullAddress":address, "additionalStreetInfo":"blank", "chart":"empty", "numberOfPurchases":"0", "grade":"5" }, function(err, uData){
       console.log(uData);
       console.log("User registered succesfully!");
     });
@@ -418,4 +513,26 @@ function checkCustomer(jData){
   }
   console.log("function result is: "+result);
   return result;
+}
+
+// all of the local users
+
+function currentCustomers(email, ipAddress){
+  currentCustomersArray.push({email, ipAddress});
+}
+
+// getting the info of an special customer
+function getCustomerInfo(email, password){
+  console.log("his email: "+email+" his password: "+password);
+  mongo.connect(sPath, function(err, oDb){
+    if(err) throw err;
+    // read the data from the collection
+    var customer = oDb.collection("customer");
+    console.log("Retriving the customers info....");
+    // getting customers information
+    customer.find({"name":"customer", "email":email, "password":password}).toArray(function(err, ajCustomer){
+      globalJsonOneCustomer = ajCustomer;
+      console.log("retrived the customer: "+ajCustomer[0].email);
+    });
+  });
 }
