@@ -2,7 +2,9 @@
 var express = require("express"), redirect = require("express-redirect");
 var app = express();
 redirect(app);
-
+// ability to use sessions for the users who log-in
+var session = require('express-session');
+app.use(session({secret:"32dawd3ecdwxder23fec3", resave: false, saveUninitialized: true}));
 // creating a socket server
 var server = require("http").Server(app);
 var io = require("socket.io")(server);
@@ -23,18 +25,22 @@ var getIP = require('ipware')().get_ip;
 // enabling the usage of public files
 app.use(express.static(__dirname+'/public'));
 
-/*******************************************************/
-/*******************************************************/
-/*******************************************************/
-/*******************************************************/
-/*******************************************************/
+/******************** Making a chat system smart *********************/
 
-// calling global methods //
+// using other js files
+var employeeObject = require(__dirname+"/employeeObject.js");
+// array that will store all of the current employees
+var aEmployees = [];
+let employeeLogedIn = false;
+let employeeCount = aEmployees.length;
 
-getLeasureBikes();
-getMtbBikes();
-getRoadBikes();
-getAllCustomers();
+
+
+/*******************************************************/
+/*******************************************************/
+/*******************************************************/
+/*******************************************************/
+/*******************************************************/
 
 // global variables //
 
@@ -44,9 +50,18 @@ let globalJsonRoadBikes = [];
 let globalJsonCustomers = [];
 let globalJsonOneCustomer = [];
 let currentCustomersArray = [];
+let globalJsonEmployee = [];
 var chosenBikeArray="";
 let logInCheck = false;
 let beenHereBefore = false;
+
+// calling global methods //
+
+getLeasureBikes();
+getMtbBikes();
+getRoadBikes();
+getAllCustomers();
+getEmployee();
 
 io.on("connection", function(oSocket){
   // on is used to receive the message
@@ -60,27 +75,67 @@ io.on("connection", function(oSocket){
     oSocket.broadcast.emit("server_response", {"message":sMessage});
   });
 
-  oSocket.on("customer_log_in", function(jData){
+  oSocket.on("employee_log_in", function(jData){
     var username = jData.username;
     var password = jData.password;
 
-    // checking if the username and password exists in the database
-    mongo.connect(sPath, function(err, oDb){
-      var employee = oDb.collection("employee");
-      // checking if mongo can fetch the employee
-      employee.find({"username":username, "password":password}).toArray(function(err, ajEmployee){
-        if(err){
-          console.log("Employee doesnt exist");
-        }
-        // console.log(ajEmployee[0].name);
-        else /*(username==ajEmployee[0].username && password==ajEmployee[0].password)*/{
-          console.log("they match");
-          // employee exists so now we can call a function that presents a employee with a chat view
-            oSocket.emit("login_response", {"message":"success"});
-        }
-      });
-    });
+    // check if the employee exists
+    for (var i = 0; i < globalJsonEmployee.length; i++) {
+      if(globalJsonEmployee[i].username == username && globalJsonEmployee[i].password == password){
+        console.log("Employee has been authorized, sending socket response back to the server");
+        oSocket.emit("login_response", {"message":"sucess"});
+        // employee chat system logic
+        employeeLogedIn = true;
+        aEmployees.push(employeeObject.fnCreateEmployee(globalJsonEmployee[i].firstName, "online"));
+        console.log("employee object pushed into an array "+aEmployees+" / and boolean var set to "+employeeLogedIn);
+        break;
+      }else {
+        console.log("Empoyee cannot be authorized, waiting for the user to try again...");
+        oSocket.emit("login_response", {"message":"failure"});
+      }
+    }
   });
+
+  /********** more employee logic here, checking if he is available ************/
+  oSocket.on("employee_available", function(jData){
+    // check if the employee is available
+    if(employeeLogedIn && aEmployees.length!=0){
+      // means that the employee is online and the chat can begin buhahaha
+      console.log("client tried to initiate the chat, result is good, employee available");
+      console.log("employee name  "+aEmployees[0].name);
+      for (var i = 0; i < aEmployees.length; i++) {
+        if(aEmployees[i].status == "online"){
+          oSocket.emit("chat-initiated", {"message":"sucess","name":aEmployees[i].name});
+          aEmployees[i].status = "busy";
+          console.log(aEmployees[i].status);
+        }
+        else{
+          console.log("No free employees found");
+          oSocket.emit("chat-initiated", {"message":"failure", "reason":"No free employees found"});
+        }
+      }
+    }
+    else{
+      oSocket.emit("chat-initiated", {"message":"failure", "reason":"No employees online"});
+    }
+  });
+
+  /******************** employee log out **********************/
+oSocket.on("employee-log-out", function(jData){
+  console.log("socket recieved");
+  for (var i = 0; i < globalJsonEmployee.length; i++) {
+    if(globalJsonEmployee[i].username == jData.username){
+      console.log("Found the match, its a "+i+". employee");
+        for (var j = 0; j < aEmployees.length; j++) {
+          if(aEmployees[j].name == globalJsonEmployee[i].firstName){
+            console.log("Names match!!");
+            aEmployees.splice(j,1);
+            console.log("array length is now: "+aEmployees.length);
+          }
+        }
+    }
+  }
+});
 
   /****************** retriving bikes from the database ***********************/
    oSocket.on("get_all_bikes", function(jData){
@@ -88,12 +143,6 @@ io.on("connection", function(oSocket){
      mongo.connect(sPath, function(err, oDb){
        if(err) throw err;
        oDb.listCollections().toArray(function(err, collections){
-        //  console.log(collections[0].name+collections[1].name);
-        //  console.log("The database has:"+collections.length+" collections");
-        // putting collections into a var
-        // for(let i = 1 ; i < collections.length; i++){
-        //   var object = "name"
-        // }
         oSocket.emit("returning_bike_types", collections);
        });
      });
@@ -180,6 +229,28 @@ app.get("/", function(req, res){
   res.sendFile(__dirname+"/gui/index.html");
 });
 
+// employee chat i am alive message
+app.get("/shutItDown/:employee", function(req, res){
+  console.log("Shutting it down");
+  let name = req.params.employee;
+
+  for (var i = 0; i < aEmployees.length; i++) {
+    if(aEmployees[i].name == name){
+      aEmployees[i].status = "online";
+    }
+  }
+});
+
+app.get("/logInSessionTest/:email/:password", function(req, res){
+  let email = req.params.email;
+  let password = req.params.password;
+
+  console.log("Ajax works, this is the data --> "+email+"  "+password);
+
+    req.session.email = email;
+    req.session.password = password;
+});
+
 app.get("/employee_log_in", function(req, res){
   beenHereBefore = false;
   res.sendFile(__dirname+"/gui/employee_log_in.html")
@@ -233,7 +304,7 @@ app.get("/geometry", function(req, res){
 // customer page
 app.get("/customerPage/:email", function(req, res){
 
-  if(logInCheck || beenHereBefore){
+  if(logInCheck && beenHereBefore){
     beenHereBefore = true;
     // here we have to fulfill the page with the credentials of the user
     let email = req.params.email;
@@ -270,7 +341,7 @@ app.get("/customerPage/:email", function(req, res){
     // res.send("Sup fuckaaaaa   ---> "+email+" ur IP is: "+ipInfo.clientIp);
   }
   else {
-    res.send("fuck off!!");
+    res.send("Acess denied");
   }
 });
 
@@ -403,6 +474,23 @@ server.listen(500, function(err){
 /********************************************************/
 
 //   methods that retrive the data from the database fuck yea //
+
+
+function getEmployee(){
+  console.log("getEmployee function is called....");
+  mongo.connect(sPath, function(err, oDb){
+    var employee = oDb.collection("employee");
+    console.log("Retriving the employees....");
+    // checking if mongo can fetch the employee
+    employee.find({"name":"employee"}).toArray(function(err, ajEmployee){
+      if(err) throw err;
+      else{
+        globalJsonEmployee = ajEmployee;
+        console.log("Retrived all employees from the database...");
+      }
+    });
+  });
+}
 
 // leasure bikes retrival
 
